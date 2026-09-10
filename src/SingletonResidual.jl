@@ -1,5 +1,5 @@
-export residual, enlarge_context, ≼, ∸, ∨, ∧, refl_dominator, refl_core, imbalance,
-       isreflexive, refl_leq, refl_above, refl_meet, core, →ₒ
+export residual, enlarge_context, ≼, ∸, ∨, ∧, refl_dominator, refl_core, 
+       imbalance, isreflexive, refl_leq, refl_above, refl_meet, core, →ₒ
 
 # The building block for residuation: the residual `{s} ⊸ C` of a
 # constructible triple `C` by a *single* element `s` of `M = K[X]²`,
@@ -11,19 +11,17 @@ export residual, enlarge_context, ≼, ∸, ∨, ∧, refl_dominator, refl_core,
 # intersections of these and live in `Residual.jl`.
 # here everything is a computation on generators.
 #
-# This file also holds the methods that distinguish `ℕ` from `𝔹` coefficients
-# (`Semiring.jl`): `refl_leq`, `refl_meet`, `residual_strict`, `residual_refl`
-# and `refl_predecessors`, each given for both semirings side by side.
-
-
+# This file also holds the methods that distinguish `ℕ` from `𝔹` multiplicities:
+# `refl_leq`, `refl_meet`, `residual_strict`, `residual_refl` and
+# `refl_predecessors`, each given for both side by side.
 
 # The reflexive submonoid R ⊆ M
-#-----------------------------
+###############################
 
 # `R` consists of the sequents `Z ⊢ Z` with the same side twice.
 # Every `s` is sandwiched by reflexive elements, `sᵣ ≼ s ≼ ŝ`,
 # and these two bounds together with the imbalance are the "gadgets" that make
-# `ℛ` computable (`lemma:reflprops`).
+# `ℛ` computable.
 
 """ Is `s ∈ R`, i.e. `s⁺ = s⁻`? """
 isreflexive(s::Sequent)::Bool = s.prem == s.conc
@@ -65,8 +63,8 @@ core(i::Dict{Term,Int})::Sequent{ℕ} =
   Sequent{ℕ}(MultiSet(Dict{Term,Int}(t => n for (t, n) in i if n > 0)),
              MultiSet(Dict{Term,Int}(t => -n for (t, n) in i if n < 0)))
 
-# The order ≤_ℛ, in both semirings
-#---------------------------------
+# The order ≤_ℛ, for both multiplicities
+#---------------------------------------
 
 """
 The order `m ≤_ℛ t`, i.e. `t ∈ ℛ(m)`: `t = m + ρ` for some `ρ ∈ R`.
@@ -82,8 +80,8 @@ refl_leq(m::Sequent{𝔹}, t::Sequent{𝔹})::Bool =
   m ≼ t && (t.prem ∸ m.prem) ≼ t.conc && (t.conc ∸ m.conc) ≼ t.prem
 
 """
-The least element of `ℛ(m)` above `w`, namely `m + (w ∸ m)^`
-(`lemma:reflprops` e). In both semirings: `m + ρ ≽ w` iff `ρ ≽ w ∸ m` iff
+The least element of `ℛ(m)` above `w`, namely `m + (w ∸ m)^`. 
+For both multiplicities: `m + ρ ≽ w` iff `ρ ≽ w ∸ m` iff
 `ρ ≽ (w ∸ m)^`, for `ρ ∈ R`.
 """
 (refl_above(m::Sequent{K}, w::Sequent{K})::Sequent{K}) where K =
@@ -93,7 +91,7 @@ The least element of `ℛ(m)` above `w`, namely `m + (w ∸ m)^`
 A generator of `ℛ(m₁) ∩ ℛ(m₂)`, or `nothing` if that is empty.
 
 With `ℕ` coefficients the intersection is `ℛ(m₁ ∨ m₂)` when the imbalances
-agree and empty otherwise (`lemma:reflprops` d). With `𝔹` coefficients it is
+agree and empty otherwise. With `𝔹` coefficients it is
 never empty: by `refl_leq`, `t` lies in both iff `t ≽ m₁ ∨ m₂` and every signed
 claimable of `t` outside `m₁ ∧ m₂` is balanced in `t`, i.e.
 `t ∈ ℛ(m₁ ∧ m₂) ∩ 𝒲(m₁ ∨ m₂)`, which `refl_above` generates. E.g.
@@ -138,7 +136,7 @@ subsequents(s::Sequent{𝔹})::Vector{Sequent{𝔹}} =
 The generators of `{s} ⊸ ℛ(m) = {t | s + t = m + ρ for some ρ ∈ R}`, the union
 of `{s} ⊸ {m + ρ}` over `ρ ∈ R`.
 
-With `ℕ` coefficients (`lemma:reflresidual`) `ρ` must bring `m` above `s`, the
+With `ℕ` coefficients `ρ` must bring `m` above `s`, the
 least such is `(s ∸ m)^`, every other differs from it by an element of `R`, and
 `{s} ⊸ {m + ρ}` is a singleton: so `{s} ⊸ ℛ(m) = ℛ(m + (s ∸ m)^ - s)`.
 
@@ -170,8 +168,8 @@ terms(s::Sequent)::Set{Term} = Set{Term}(keys(s.prem)) ∪ Set{Term}(keys(s.conc
 
 """
 The residual `{s} ⊸ C = {t | s + t ∈ C}` of a constructible triple by a single
-element `s ∈ M`, as a constructible triple over `C.context ∪ supp(s)`
-(`lemma:reflresidual`). Writing `C = ⟨κ, μ, λ⟩`, the residual is `⟨κ′, μ′, λ′⟩`
+element `s ∈ M`, as a constructible triple over `C.context ∪ supp(s)`. 
+Writing `C = ⟨κ, μ, λ⟩`, the residual is `⟨κ′, μ′, λ′⟩`
 with
 
     κ′ = ⋃_{k ∈ κ} {s} ⊸ {k}          (`residual_strict`)
@@ -199,5 +197,5 @@ function residual(s::Sequent{K}, C::Constructible{K})::Constructible{K} where K
   Constructible{K}(κ′, μ′, λ′, C.context)
 end
 
-# Infix notation
+# Infix notation for `residual`. Because ⊸ is not a valid Julia operator.
 →ₒ(a,b) = residual(a, b)

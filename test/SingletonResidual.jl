@@ -1,6 +1,10 @@
 module TestSingletonResidual
 
 using Test, NominalFrames
+using NominalFrames: refl_above, refl_meet, refl_predecessors, residual_strict,
+                     residual_refl, terms, powerset
+
+default_multiplicity!(ℕ)
 
 ψ′,P′,Q′ = ps = Predicate.([:ψ,:P,:Q], [0,1,2])
 ψ = Term(ψ′)
@@ -12,8 +16,6 @@ Q(i,j) = Term(Q′,[i,j])
 ∅, Γ1 = Set{Int}(), Set([1])
 
 S(x) = Sequent(x)
-C(κ, μ, λ, ctx) = Constructible(Set{Sequent}(S.(κ)), Set{Sequent}(S.(μ)),
-                                Set{Sequent}(S.(λ)), Set{Int}(ctx))
 
 # The reflexive submonoid
 #------------------------
@@ -50,7 +52,7 @@ I𝒟 = Constructible([P⁺₁Q⁻₁₂], [], refl, [])
 
 new_gens = [:(ψ ⊢ ψ), :(P(1) ⊢ P(1)), :(P(2) ⊢ P(2)),
             :(Q(1,2) ⊢ Q(1,2)), :(Q(2,1) ⊢ Q(2,1)), :(Q(2, 3) ⊢ Q(2, 3))]
-@test enlarge_context(I𝒪, Γ1) == C([], [], new_gens, Γ1)
+@test enlarge_context(I𝒪, Γ1) == 𝒲(new_gens, Γ1)
 
 # The singleton residual
 #-----------------------
@@ -76,11 +78,11 @@ s₁ = S(:(P(1) ⊢ 0))
 # e.g. (Iℛ.refl .+ refl_dominator(s₁ ∸ Iℛ.refl) .- s₁)
 
 # {s} ⊸ κ keeps only generators above `s`, and subtracts it
-@test (s₁ →ₒ I𝒟).strict == Set([S(:(0 ⊢ Q(1,2)))])
-@test (S(:(P(2) ⊢ 0)) →ₒ I𝒟).strict == Set([S(:(0 ⊢ Q(2,1)))])
+@test only((s₁ →ₒ I𝒟).strict) == S(:(0 ⊢ Q(1,2)))
+@test only((S(:(P(2) ⊢ 0)) →ₒ I𝒟).strict) == S(:(0 ⊢ Q(2,1)))
 @test isempty((S(:(ψ ⊢ 0)) →ₒ I𝒟).strict)
-@test (S(:(0 ⊢ Q(1,2))) →ₒ I𝒟).strict == Set([S(:(P(1) ⊢ 0))])
-@test (S(:(0 ⊢ Q(2,1))) →ₒ I𝒟).strict == Set([S(:(P(2) ⊢ 0))])
+@test only((S(:(0 ⊢ Q(1,2))) →ₒ I𝒟).strict) == S(:(P(1) ⊢ 0))
+@test only((S(:(0 ⊢ Q(2,1))) →ₒ I𝒟).strict) == S(:(P(2) ⊢ 0))
 @test (s₁ →ₒ I𝒟).context == Γ1
 
 # Residuating by 0 changes nothing but the presentation's context
@@ -93,7 +95,7 @@ s₁ = S(:(P(1) ⊢ 0))
 #--------------------------------------------------
 
 """
-Membership `t ∈ κ ∪ 𝒲(λ) ∪ ℛ(μ)` by exhaustive search (`lemma:matching`): a
+Membership `t ∈ κ ∪ 𝒲(λ) ∪ ℛ(μ)` by exhaustive search: a
 witness below `t` can only use names of `t` and of the context.
 """
 function member(t::Sequent, C::Constructible)::Bool
@@ -103,22 +105,6 @@ function member(t::Sequent, C::Constructible)::Bool
     any(l′ ≼ t for l in C.weak for l′ in orbit(l, Δ, pool)) ||
     any(refl_leq(m′, t) for m in C.refl for m′ in orbit(m, Δ, pool))
 end
-
-""" Every sequent of size ≤ `n` whose names are drawn from `names` """
-function small_sequents(Σ::Signature, names::Vector{Int}, n::Int)::Vector{Sequent}
-  terms = [Term(p, collect(a)) for p in Σ for a in injections_args(p.arity, names)]
-  signed = [(t, side) for t in terms for side in (:prem, :conc)]
-  res = Sequent[]
-  for k in 0:n, choice in Iterators.product(fill(signed, k)...)
-    prem = Term[t for (t, side) in choice if side == :prem]
-    conc = Term[t for (t, side) in choice if side == :conc]
-    push!(res, Sequent(prem, conc))
-  end
-  unique(res)
-end
-
-injections_args(arity::Int, names::Vector{Int}) =
-  [Int[ρ[i] for i in 1:arity] for ρ in injections(collect(1:arity), names)]
 
 ts = small_sequents(Σ, [1, 2, 3], 2)
 @test length(ts) == 1 + 20 + 20 + binomial(20, 2)
@@ -134,6 +120,98 @@ for I in [I𝒪, Iℛ, I𝒲, I𝒟],
   R = s →ₒ I
   for t in ts
     @test member(t, R) == member(s + t, I)
+  end
+end
+
+# With 𝔹 coefficients
+#####################
+#
+# Sides are sets, so `t = m + ρ` no longer determines `ρ ∈ R`: `a⁺ + a⁺a⁻ = a⁺a⁻`.
+# The `𝔹` methods of `refl_leq`, `refl_above`, `refl_meet`, `refl_predecessors`,
+# `residual_strict` and `residual_refl` are checked by hand where they differ
+# from the `ℕ` ones, and against brute force.
+
+S′(x) = Sequent{𝔹}(x)
+S′(x::Sequent{𝔹}) = x
+C′(κ, μ, λ, ctx) = Constructible{𝔹}(S′.(κ), S′.(μ), S′.(λ), Set{Int}(ctx))
+Σψ = Signature([ψ′])
+
+# The order ≤_ℛ
+#--------------
+
+# `a⁺ + a⁺a⁻ = a⁺a⁻`, so `a⁺ ≤_ℛ a⁺a⁻` with 𝔹 coefficients and not with ℕ
+@test refl_leq(S′(:(ψ ⊢ 0)), S′(:(ψ ⊢ ψ)))
+@test !refl_leq(S(:(ψ ⊢ 0)), S(:(ψ ⊢ ψ)))
+@test refl_leq(S′(:(ψ ⊢ 0)), S′(:(ψ + P(1) ⊢ P(1))))
+@test !refl_leq(S′(:(ψ ⊢ 0)), S′(:(ψ + P(1) ⊢ 0)))
+@test !refl_leq(S′(:(ψ ⊢ 0)), S′(:(0 ⊢ ψ)))
+# Brute force: `t ∈ ℛ(m)` iff `t = m + (Z ⊢ Z)` for some set `Z` of terms of `t`
+function refl_leq_bf(m::Sequent{𝔹}, t::Sequent{𝔹})
+  Z = collect(terms(t))
+  any(t == m + Sequent{𝔹}(collect(z), collect(z)) for z in powerset(Z))
+end
+all′ = small_sequents(𝔹, Σ, [1, 2], 3)
+for m in small_sequents(𝔹, Σ, [1, 2], 2), t in all′
+  @test refl_leq(m, t) == refl_leq_bf(m, t)
+end
+
+# Least element of ℛ(m) above w, and ℛ(m₁) ∩ ℛ(m₂)
+@test refl_above(S′(:(ψ ⊢ 0)), S′(:(0 ⊢ P(1)))) == S′(:(ψ + P(1) ⊢ P(1)))
+@test refl_meet(S′(:(ψ ⊢ 0)), S′(:(P(1) ⊢ 0))) == S′(:(ψ + P(1) ⊢ ψ + P(1)))  # never empty
+@test isnothing(refl_meet(S(:(ψ ⊢ 0)), S(:(P(1) ⊢ 0))))
+for m₁ in small_sequents(𝔹, Σψ, Int[], 2), m₂ in small_sequents(𝔹, Σψ, Int[], 2),
+    t in small_sequents(𝔹, Σψ, Int[], 2)
+  @test refl_leq(refl_meet(m₁, m₂), t) == (refl_leq(m₁, t) && refl_leq(m₂, t))
+end
+for m in small_sequents(𝔹, Σ, [1, 2], 2), w in small_sequents(𝔹, Σ, [1, 2], 2)
+  u = refl_above(m, w)
+  @test refl_leq(m, u) && w ≼ u
+  @test all(!(refl_leq(m, t) && w ≼ t) || u ≼ t for t in all′)
+end
+
+# One ≤_ℛ-step down: either or both halves of a balanced pair
+@test Set(refl_predecessors(S′(:(ψ + P(1) ⊢ ψ)))) ==
+      Set(S′.([:(P(1) ⊢ ψ), :(ψ + P(1) ⊢ 0), :(P(1) ⊢ 0)]))
+@test refl_predecessors(S(:(ψ + P(1) ⊢ ψ))) == [S(:(P(1) ⊢ 0))]
+
+# Singleton residuals, generator by generator
+#--------------------------------------------
+
+# `{s} ⊸ {k}` is an interval
+@test Set(residual_strict(S′(:(ψ ⊢ 0)), S′(:(ψ + P(1) ⊢ 0)))) ==
+      Set(S′.([:(P(1) ⊢ 0), :(ψ + P(1) ⊢ 0)]))
+@test residual_strict(S(:(ψ ⊢ 0)), S(:(ψ + P(1) ⊢ 0))) == [S(:(P(1) ⊢ 0))]
+@test isempty(residual_strict(S′(:(ψ ⊢ 0)), S′(:(P(1) ⊢ 0))))
+# `{a⁺} ⊸ ℛ(a⁺b⁻) = ℛ(b⁻) ∪ ℛ(a⁺b⁻) ∪ ℛ(a⁻b⁻)`
+@test Set(residual_refl(S′(:(ψ ⊢ 0)), S′(:(ψ ⊢ P(1))))) ==
+      Set(S′.([:(0 ⊢ P(1)), :(ψ ⊢ P(1)), :(0 ⊢ ψ + P(1))]))
+@test only(residual_refl(S(:(ψ ⊢ 0)), S(:(ψ ⊢ P(1))))) == S(:(0 ⊢ P(1)))
+
+# Brute-force oracle: `t ∈ {s} ⊸ C  iff  s + t ∈ C`
+#--------------------------------------------------
+
+""" `member`, with the brute-force `refl_leq_bf` in place of `refl_leq` """
+function member′(t::Sequent{𝔹}, C::Constructible{𝔹})::Bool
+  Δ = C.context
+  pool = t.supp ∪ Δ
+  any(same_orbit(t, k, Δ) for k in C.strict) ||
+    any(l′ ≼ t for l in C.weak for l′ in orbit(l, Δ, pool)) ||
+    any(refl_leq_bf(m′, t) for m in C.refl for m′ in orbit(m, Δ, pool))
+end
+
+refl′ = refl_sequents(𝔹, Σ)
+s₀′ = S′(:(P(1) ⊢ Q(1,2)))
+frames′ = [𝒲(refl′), ℛ(refl′), 𝒲([refl′; s₀′]), κ(s₀′) ∪ 𝒲(refl′)]
+ts′ = small_sequents(𝔹, Σ, [1, 2, 3], 2)
+
+for I in [frames′; C′([:(P(1) ⊢ 0)], [:(ψ ⊢ 0)], [:(Q(1,2) ⊢ 0)], ∅);
+          C′([:(ψ ⊢ P(1))], [:(ψ ⊢ P(1))], [], ∅)],
+    s in S′.([:(P(1) ⊢ 0), :(0 ⊢ P(1)), :(ψ ⊢ 0), :(P(1) ⊢ P(1)), :(0 ⊢ Q(1,2)),
+              :(P(2) ⊢ Q(2,1)), :(P(1) ⊢ ψ), :(P(1) + P(2) ⊢ 0)])
+  R = s →ₒ I
+  @test R.context == I.context ∪ s.supp
+  for t in ts′
+    @test member′(t, R) == member′(s + t, I)
   end
 end
 

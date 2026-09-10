@@ -1,7 +1,9 @@
-module TestPowerElems 
+module TestPowerElems
 
 using NominalFrames, Test
-using NominalFrames: embeddings, in_strict, in_weak, in_refl
+using NominalFrames: embeddings, in_strict, in_weak, in_refl, terms, powerset
+
+default_multiplicity!(ℕ)
 
 # Example signature and terms
 
@@ -22,7 +24,7 @@ s₀ = Sequent([P₁], [Q₁₂])
 I𝒪 = 𝒲(refl)
 I𝒲 = 𝒲([refl; s₀])
 Iℛ = ℛ(refl)
-I𝒟 = κ([s₀]) ∪ I𝒪
+I𝒟 = κ(s₀) ∪ I𝒪
 
 ∅, Γ1 = Set{Int}(), Set([1])
 ⊤, ⊥ = top(∅), bottom(∅)
@@ -58,7 +60,7 @@ s₀ = Sequent([P(1)], [Q(1,2)])
 # Checking refl
 ################
 
-@test in_refl(s₀ + Sequent(:(Q(2,3)⊢Q(2,3))), ℛ([s₀]))
+@test in_refl(s₀ + Sequent(:(Q(2,3)⊢Q(2,3))), ℛ(s₀))
 
 @test !in_refl(s₀, ⊤) 
 
@@ -78,7 +80,7 @@ s₀ = Sequent([P(1)], [Q(1,2)])
 @test !any(t ∈ ⊥ for t in ts)
 
 # With a context, names in it are rigid: `Q(2,3)` at {1} covers Q(a,b) with a,b ≠ 1
-D = κ([:(Q(2, 3) ⊢ 0)], [1])
+D = κ(:(Q(2, 3) ⊢ 0), [1])
 @test Sequent(:(Q(3,2) ⊢ 0)) ∈ D 
 @test Sequent(:(Q(1,2) ⊢ 0)) ∉ D 
 @test Sequent(:(Q(2,1) ⊢ 0)) ∉ D
@@ -110,22 +112,97 @@ G = Constructible(Sequent.([:(P(1) ⊢ P(1)), :(P(1) ⊢ Q(1,2))]),
 @test (⊤ ∩ I𝒟) == I𝒟
 @test (⊥ ∩ I𝒟) == ⊥
 # 𝒲(P⁺_a) ∩ 𝒲(P⁺_b) = 𝒲(P⁺_a) ∪ 𝒲(P⁺_a P⁺_b) = 𝒲(P⁺_a), once pruned
-@test only((𝒲([:(P(1) ⊢ 0)]) ∩ 𝒲([:(P(1) ⊢ 0)])).weak) ==
+@test only((𝒲(:(P(1) ⊢ 0)) ∩ 𝒲(:(P(1) ⊢ 0))).weak) ==
       Sequent(:(P(1) ⊢ 0))
 
       # ℛ(ψ⁺) ∩ 𝒲(P⁺_a) = ℛ(ψ⁺ P⁺_a P⁻_a)
-@test only((ℛ([:(ψ ⊢ 0)]) ∩ 𝒲([:(P(1) ⊢ 0)])).refl) == Sequent(:(ψ + P(1) ⊢ P(1)))
+@test only((ℛ(:(ψ ⊢ 0)) ∩ 𝒲(:(P(1) ⊢ 0))).refl) == Sequent(:(ψ + P(1) ⊢ P(1)))
 # ℛ(ψ⁺) ∩ ℛ(P⁺_a) = ∅: imbalances never agree
-@test ℛ([:(ψ ⊢ 0)]) ∩ ℛ([:(P(1) ⊢ 0)]) == ⊥
+@test ℛ(:(ψ ⊢ 0)) ∩ ℛ(:(P(1) ⊢ 0)) == ⊥
 
 
 # Brute force intersection test
 As = [I𝒪,I𝒲,Iℛ,I𝒟, ⊤, ⊥, 
       Constructible([:(P(1) ⊢ 0)], [:(ψ ⊢ 0)], [:(Q(1,2) ⊢ 0)]),
       Constructible([], [:(P(1) ⊢ 0)], [:(P(1) ⊢ ψ)]),
-      𝒲([:(P(1) ⊢ 0)], [1])]
+      𝒲(:(P(1) ⊢ 0), [1])]
 for A in As, B in As, t in ts
   @test (t ∈ A ∩ B) == (t ∈ A && t ∈ B)
 end
+
+# With 𝔹 coefficients
+#####################
+
+S′(x) = Sequent{𝔹}(x)
+S′(x::Sequent{𝔹}) = x
+C′(κ, μ, λ, ctx) = Constructible{𝔹}(S′.(κ), S′.(μ), S′.(λ), Set{Int}(ctx))
+⊤′, ⊥′ = top(𝔹, ∅), bottom(𝔹, ∅)
+
+refl′ = refl_sequents(𝔹, Σ)
+s₀′ = S′(:(P(1) ⊢ Q(1,2)))
+I𝒪′, I𝒲′, Iℛ′ = 𝒲(refl′), 𝒲([refl′; s₀′]), ℛ(refl′)
+I𝒟′ = κ(s₀′) ∪ I𝒪′
+frames′ = [I𝒪′, Iℛ′, I𝒲′, I𝒟′]
+@test all(F isa Constructible{𝔹} for F in frames′)
+
+# Between the multiplicities: `q` generator by generator
+#-------------------------------------------------------
+
+for (I, I′) in zip([I𝒪, Iℛ, I𝒲, I𝒟], frames′)
+  @test Constructible{𝔹}(I) == I′
+end
+@test Constructible{𝔹}(𝒲(:(2P(1) ⊢ 0), [1])) == 𝒲(S′(:(P(1) ⊢ 0)), [1])
+@test Constructible{𝔹}(⊤) == ⊤′ && Constructible{𝔹}(⊥) == ⊥′
+
+# Membership
+#-----------
+
+ts′ = small_sequents(𝔹, Σ, [1, 2, 3], 2)
+@test length(ts′) == 1 + 20 + binomial(20, 2)   # no `2x` sequents
+
+@test S′(:(P(1) + ψ ⊢ ψ + P(1))) ∈ Iℛ′
+@test S′(:(P(1) + ψ ⊢ ψ)) ∉ Iℛ′
+@test S′(:(P(1) + ψ ⊢ 0)) ∉ Iℛ′
+@test S′(:(ψ ⊢ ψ)) ∈ ℛ(S′(:(ψ ⊢ 0)))     # ψ⁺ + ψ⁺ψ⁻ = ψ⁺ψ⁻, so ψ⁺ ≤_ℛ ψ⁺ψ⁻ ...
+@test Sequent(:(ψ ⊢ ψ)) ∉ ℛ(Sequent(:(ψ ⊢ 0))) # ... but not w/ multiplicities
+@test all(t ∈ ⊤′ for t in ts′) && !any(t ∈ ⊥′ for t in ts′)
+
+"""
+Membership `t ∈ κ ∪ 𝒲(λ) ∪ ℛ(μ)` by exhaustive search: a witness below `t` can
+only use names of `t` and of the context, and `t ∈ ℛ(m)` iff `t = m + (Z ⊢ Z)`
+for some set `Z` of terms of `t`.
+"""
+function member′(t::Sequent{𝔹}, C::Constructible{𝔹})::Bool
+  Δ = C.context
+  pool = t.supp ∪ Δ
+  refl_leq_bf(m, t) = any(t == m + Sequent{𝔹}(collect(z), collect(z))
+                          for z in powerset(collect(terms(t))))
+  any(same_orbit(t, k, Δ) for k in C.strict) ||
+    any(l′ ≼ t for l in C.weak for l′ in orbit(l, Δ, pool)) ||
+    any(refl_leq_bf(m′, t) for m in C.refl for m′ in orbit(m, Δ, pool))
+end
+
+for I in frames′, t in ts′
+  @test (t ∈ I) == member′(t, I)
+end
+# Enlarging the context presents the same subobject
+for I in frames′, Δ in [Γ1, Set([1, 2])], t in ts′
+  @test member′(t, I) == member′(t, enlarge_context(I, Δ))
+end
+
+# Binary intersection
+#--------------------
+
+As′ = [I𝒪′, I𝒲′, Iℛ′, I𝒟′, ⊤′, ⊥′,
+       C′([:(P(1) ⊢ 0)], [:(ψ ⊢ 0)], [:(Q(1,2) ⊢ 0)], []),
+       C′([], [:(P(1) ⊢ 0)], [:(P(1) ⊢ ψ)], []),
+       C′([], [:(P(1) ⊢ 0), :(ψ ⊢ 0)], [], []),
+       𝒲(S′(:(P(1) ⊢ 0)), [1])]
+for A in As′, B in As′, t in ts′
+  @test (t ∈ A ∩ B) == (t ∈ A && t ∈ B)
+end
+# ℛ(ψ⁺) ∩ ℛ(P⁺ₐ) = ℛ(ψ⁺P⁺ₐψ⁻P⁻ₐ), nonempty unlike its ℕ counterpart above
+@test only((ℛ(S′(:(ψ ⊢ 0))) ∩ ℛ(S′(:(P(1) ⊢ 0)))).refl
+          ) == S′(:(ψ + P(1) ⊢ ψ + P(1)))
 
 end # module

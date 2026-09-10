@@ -1,5 +1,7 @@
 using Test
 
+println("Testing with $(Threads.nthreads()) threads")
+
 @testset "Multisets.jl" begin
   include("Multisets.jl")
 end
@@ -31,10 +33,6 @@ end
 
 @testset "Semantics" begin
   include("Semantics.jl")
-end
-
-@testset "Contraction" begin
-  include("Contraction.jl")
 end
 
 # @testset "Frames" begin

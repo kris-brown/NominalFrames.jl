@@ -1,189 +1,197 @@
-# # The courtroom: a substructural frame that is not in the paper
+# # The courtroom: several individuals, a relation between them, and quantifiers
 #
-# Run with `julia --project=. test/unchecked/courtroom.jl`.
+# Run it with `julia --project=. demos/courtroom.jl`. It assumes the reader has
+# seen `demo.jl`.
 #
-# Three claimables: `W(x)` — "x testifies to the crime"; `C` — "the accused is
-# convicted"; and `R` — "it rained", which takes part in no inference and is
-# there to be carried around. The rule of the court is that two *distinct*
-# witnesses convict:
+# The first demo had one argument place per predicate and one individual at a
+# time. Here claimables relate individuals to one another, and the interesting
+# questions quantify over who did what. As before, premises and conclusions
+# are sets and containment holds.
 #
-#     W(x), W(y) ⊢ C
-#
-# What makes this substructural is what the rule does *not* say, and the
-# choices give three courts on one signature:
-#
-# - the *linear* court `I_lin = ℛ(W⁺ₓW⁺ᵧC⁻) ∪ 𝒲(refl)`: no contraction (one
-#   witness testifying twice is not two witnesses) and no weakening — the rule
-#   may only be padded *reflexively*, `W(x), W(y), Z ⊢ C, Z`, so side
-#   commitments are carried across rather than dropped;
-# - the *affine* court `I_aff = 𝒲(W⁺ₓW⁺ᵧC⁻) ∪ 𝒲(refl)`: still no contraction,
-#   but anything may be added anywhere;
-# - the *contractive* court `I_con = I_aff ∪ 𝒲(2W⁺ₓC⁻)`: the same witness
-#   twice does convict.
-#
-# All contain the reflexive `t ⊢ t` with arbitrary weakening, so `0 = 𝒲(refl)`
-# as in the paper's frames.
-#
-# The quantified queries turn on a feature of the nominal semantics: names in a
-# context are pairwise distinct, and a bound variable ranges over names *outside*
-# the context at which the formula is interpreted. The first two courts are not
-# substitution-equivariant (def:substeq) — identifying the two witnesses in the
-# rule gives `2W(x) ⊢ C`, which they reject — so Beck–Chevalley fails for them
-# (prop:hyper), and the value of `∀y. (W(y) ⊸ C)` depends on whether `a` is in
-# scope when `y` is bound. The contractive court is substitution-equivariant and
-# the dependence disappears.
+# The setting: a court in which two accusers convict (unless there is an
+# alibi), an alibi is incompatible with guilt, and nothing else is settled.
 
 module Courtroom
 
-using Test, NominalFrames
+include("prelude.jl")
 
-banner(s) = println("\n", "═"^78, "\n ", s, "\n", "═"^78)
-say(args...) = println("  ", args...)
+# ## 1. The vocabulary
 
-S(x) = Sequent(x)
-S(x::Sequent) = x
+banner("1. The vocabulary")
 
-Γ1, Γ2, Γ12, Γ123 = Set([1]), Set([2]), Set([1, 2]), Set([1, 2, 3])
+Accuses = Predicate(:Accuses, 2)   # "x testifies that y did it"
+Guilty  = Predicate(:Guilty, 1)    # "y is guilty"
+Alibi   = Predicate(:Alibi, 1)     # "y has an alibi"
+Σ = Signature([Accuses, Guilty, Alibi])
 
-W = Predicate(:W, 1)
-C = Predicate(:C, 0)
-R = Predicate(:R, 0)
-Σ = Signature([W, C, R])
-refl = refl_sequents(Σ)
-rule = S(:(W(1) + W(2) ⊢ C))
-twice = S(:(2W(1) ⊢ C))
+say("Two-place claimables relate distinct individuals: Accuses(ann, carl) is")
+say("a different claim from Accuses(carl, ann), and nobody accuses themselves.")
 
-I_lin = ℛ([rule]) ∪ 𝒲(refl)
-I_aff = 𝒲([rule; refl])
-I_con = 𝒲([rule; twice; refl])
-courts = ["linear" => Frame(Σ, I_lin),
-          "affine" => Frame(Σ, I_aff),
-          "contractive" => Frame(Σ, I_con)]
-
-banner("The three courts")
-for (name, F) in courts
-  say(rpad(name, 12), "I = ", F.sequents)
-end
-# All three presentations are already normal (the paper's `I𝒟` was not: demo.jl).
-@test [F.sequents for (_, F) in courts] == [I_lin, I_aff, I_con]
-@test twice ∉ I_lin && twice ∉ I_aff && twice ∈ I_con
-
-# A table-driven runner: each query is a label, a function of the court, and
-# the expected answers in the linear, affine and contractive courts.
-function run(queries, courts)
-  for (label, q, expected) in queries
-    answers = [q(F) for (_, F) in courts]
-    say(rpad(label, 46), join(lpad.(string.(answers), 12), " "))
-    @test answers == collect(expected)
-  end
-end
-header() = say(rpad("", 46), join(lpad.(first.(courts), 12), " "))
-
-# Atoms at context `{a, b, c}` = `{1, 2, 3}`, and the nullary `Cv`, `Rn`.
-atoms(F) = (Wa=RolePair(F, :(W(1))), Wb=RolePair(F, :(W(2))), Wc=RolePair(F, :(W(3))),
-            Cv=RolePair(F, :C), Rn=RolePair(F, :R))
-
-# ## Propositional queries
-
-banner("Propositional queries")
-header()
-run([
-  # The rule itself, and contraction.
-  ("W(a), W(b) ⊨ C",            F -> (A = atoms(F); [A.Wa, A.Wb] ⊩ [A.Cv]),              (true, true, true)),
-  ("W(a) ⊨ C",                  F -> (A = atoms(F); A.Wa ⊩ A.Cv),                        (false, false, false)),
-  ("W(a), W(a) ⊨ C",            F -> (A = atoms(F); [A.Wa, A.Wa] ⊩ [A.Cv]),              (false, false, true)),
-  ("W(a) ⊗ W(a) ⊨ C",           F -> (A = atoms(F); A.Wa ⊗ A.Wa ⊩ A.Cv),                 (false, false, true)),
-  # Weakening: a third witness, or the weather, is harmless where there is
-  # weakening and fatal in the linear court, where every commitment counts.
-  ("W(a), W(b), W(c) ⊨ C",      F -> (A = atoms(F); [A.Wa, A.Wb, A.Wc] ⊩ [A.Cv]),        (false, true, true)),
-  ("W(a), W(b), R ⊨ C",         F -> (A = atoms(F); [A.Wa, A.Wb, A.Rn] ⊩ [A.Cv]),        (false, true, true)),
-  # ... unless it is carried along to the conclusion side, which is exactly
-  # what reflexive weakening permits.
-  ("W(a), W(b), R ⊨ C ⅋ R",     F -> (A = atoms(F); [A.Wa, A.Wb, A.Rn] ⊩ [A.Cv ⅋ A.Rn]), (true, true, true)),
-  ("W(a), W(b), R ⊨ C ⊗ R",     F -> (A = atoms(F); [A.Wa, A.Wb, A.Rn] ⊩ [A.Cv ⊗ A.Rn]), (true, true, true)),
-  # A conclusion may not be dropped either, in the linear court.
-  ("W(a), W(b) ⊨ C ⅋ R",        F -> (A = atoms(F); [A.Wa, A.Wb] ⊩ [A.Cv ⅋ A.Rn]),       (false, true, true)),
-  # Additives: a case split on who the second witness is.
-  ("W(a), W(b) ⊕ W(c) ⊨ C",     F -> (A = atoms(F); [A.Wa, A.Wb ⊕ A.Wc] ⊩ [A.Cv]),       (true, true, true)),
-  ("W(a), W(b) ⊕ R ⊨ C",        F -> (A = atoms(F); [A.Wa, A.Wb ⊕ A.Rn] ⊩ [A.Cv]),       (false, false, false)),
-  ("W(a), W(b) & R ⊨ C",        F -> (A = atoms(F); [A.Wa, A.Wb & A.Rn] ⊩ [A.Cv]),       (true, true, true)),
-], courts)
-
-# ## Quantified queries
+# ## 2. The good implications
 #
-# `∀(Δ, φ)` binds the names `Δ` at the smallest context; `in_context(φ, Γ)`
-# first views `φ` at the larger context `Γ`, so that a subsequent binder ranges
-# over names outside `Γ`.
-
-banner("Quantified queries")
-header()
-run([
-  # The rule as a closed theorem. `∀x∀y` ranges over *distinct* x, y, so this
-  # says nothing about one witness testifying twice — which is asked next.
-  ("⊨ ∀x∀y. W(x) ⊗ W(y) ⊸ C",
-     F -> (A = atoms(F); [] ⊩ ∀(Γ12, lolli(A.Wa ⊗ A.Wb, A.Cv))),                   (true, true, true)),
-  ("⊨ ∀x. W(x) ⊗ W(x) ⊸ C",
-     F -> (A = atoms(F); [] ⊩ ∀(Γ1, lolli(A.Wa ⊗ A.Wa, A.Cv))),                    (false, false, true)),
-  ("⊨ ∀x. W(x) ⊸ C",
-     F -> (A = atoms(F); [] ⊩ ∀(Γ1, lolli(A.Wa, A.Cv))),                           (false, false, false)),
-  # Three witnesses under the quantifier: weakening again separates the courts.
-  ("⊨ ∀x∀y∀z. W(x) ⊗ W(y) ⊗ W(z) ⊸ C",
-     F -> (A = atoms(F); [] ⊩ ∀(Γ123, lolli(A.Wa ⊗ A.Wb ⊗ A.Wc, A.Cv))),           (false, true, true)),
-  # A witness in hand, and "any further witness convicts". Interpreted at the
-  # empty context, `y` ranges over every name — including a's — and without
-  # contraction the inference fails ...
-  ("W(a) ⊨ ∀y. (W(y) ⊸ C)   at context ∅",
-     F -> (A = atoms(F); A.Wa ⊩ ∀(Γ2, lolli(A.Wb, A.Cv))),                          (false, false, true)),
-  # ... whereas interpreted at context {a}, `y` means every name *other than*
-  # a, and any further witness does suffice. Beck–Chevalley fails in the first
-  # two courts; in the contractive court the two readings agree.
-  ("W(a) ⊨ ∀y. (W(y) ⊸ C)   at context {a}",
-     F -> (A = atoms(F); A.Wa ⊩ ∀(Γ2, in_context(lolli(A.Wb, A.Cv), Γ12))),         (true, true, true)),
-  ("W(a) ⊨ W(a) ⊸ C",
-     F -> (A = atoms(F); A.Wa ⊩ lolli(A.Wa, A.Cv)),                                 (false, false, true)),
-  # Forget who the witness was: an existential premise no longer fixes a name,
-  # so the `y` of the conclusion might be the very same person.
-  ("∃x. W(x) ⊨ ∀y. (W(y) ⊸ C)",
-     F -> (A = atoms(F); ∃(Γ1, A.Wa) ⊩ ∀(Γ2, lolli(A.Wb, A.Cv))),                   (false, false, true)),
-  # Two existential witnesses do convict: `∃x∃y` keeps them distinct.
-  ("∃x∃y. W(x) ⊗ W(y) ⊨ C",
-     F -> (A = atoms(F); ∃(Γ12, A.Wa ⊗ A.Wb) ⊩ A.Cv),                               (true, true, true)),
-  ("∃x. W(x) ⊗ W(x) ⊨ C",
-     F -> (A = atoms(F); ∃(Γ1, A.Wa ⊗ A.Wa) ⊩ A.Cv),                                (false, false, true)),
-  # And the structural collapse of the paper's example: "everyone testifies"
-  # has the absurd premisory role `0`, so it convicts anyone of anything.
-  ("∀x. W(x) ⊨ C",
-     F -> (A = atoms(F); ∀(Γ1, A.Wa) ⊩ A.Cv),                                       (true, true, true)),
-], courts)
-
-# ## The failure of Beck–Chevalley, in roles
+# `x`, `y`, `z` stand for any three *distinct* individuals. So the defeasible
+# rule really does require two accusers: one person testifying twice is not
+# covered by it (and, since premises are sets, testifying twice is testifying
+# once anyway).
 #
-# In the linear court, the conclusory role of `∀y. (W(y) ⊸ C)` interpreted at
-# `∅` contains `W⁺_cC⁻` for *every* name `c`, while interpreted at `{a}` it
-# contains them only for `c ≠ a`. Against the premisory role of `W(a)`, which
-# contains `W⁺ₐ`, the first produces `2W⁺ₐC⁻`, which the court rejects.
+# Conclusions are as sensitive to additions as premises are, so the weaker
+# claim "two accusers: guilty, or else there is an alibi" is listed separately.
+# It does not follow from the first line.
 
-banner("Beck–Chevalley, in roles (linear court)")
-F = courts[1].second
-A = atoms(F)
-at∅ = ∀(Γ2, lolli(A.Wb, A.Cv))
-at_a = ∀(Γ2, in_context(lolli(A.Wb, A.Cv), Γ12))
-say("⟦∀y. (W(y) ⊸ C)⟧₋ at ∅   = ", Constructible(at∅.conc))
-say("⟦∀y. (W(y) ⊸ C)⟧₋ at {a} = ", Constructible(at_a.conc))
-@test context(at∅) == Set{Int}() && context(at_a) == Γ1
-@test S(:(W(1) ⊢ C)) ∈ at∅.conc
-@test S(:(W(1) ⊢ C)) ∉ at_a.conc && S(:(W(2) ⊢ C)) ∈ at_a.conc
-@test S(:(2W(1) ⊢ C)) ∈ minkowski(Constructible(A.Wa.prem), Constructible(at∅.conc))
-@test S(:(2W(1) ⊢ C)) ∉ F.sequents
-# The two values differ as roles at {a}: BC fails.
-@test enlarge_context(at∅.conc, Γ1) != at_a.conc
-# ... and agree in the contractive court, where the frame is substitution-equivariant.
-Fc = courts[3].second
-Ac = atoms(Fc)
-c∅ = ∀(Γ2, lolli(Ac.Wb, Ac.Cv))
-c_a = ∀(Γ2, in_context(lolli(Ac.Wb, Ac.Cv), Γ12))
-@test enlarge_context(c∅.conc, Γ1) == c_a.conc
-@test enlarge_context(c∅.prem, Γ1) == c_a.prem
+banner("2. The good implications")
+
+defeasible = [:(Accuses(x, y) + Accuses(z, y) ⊢ Guilty(y)),             # two accusers convict
+              :(Accuses(x, y) + Accuses(z, y) ⊢ Guilty(y) + Alibi(y))]  # ... or there is an alibi
+robust     = [:(Alibi(y) + Guilty(y) ⊢ 0)]                    # an alibi is incompatible with guilt
+
+F = Frame(Σ, κ(defeasible) ∪ 𝒲(robust) ∪ containment(Σ))
+
+declare("Defeasible (good as stated):", defeasible)
+declare("Robust (good however weakened):", robust,
+        "A ⊢ A                for every claimable A (containment)")
+
+# ## 3. Asking the frame
+#
+# Ann and Bob are witnesses; Carl is the accused.
+
+banner("3. Which implications are good?")
+
+check(F, :(Accuses(ann, carl) + Accuses(bob, carl) ⊢ Guilty(carl)), expect=true)
+check(F, :(Accuses(ann, carl) ⊢ Guilty(carl)), expect=false, why="one accuser is not enough")
+check(F, :(Accuses(ann, carl) + Accuses(bob, carl) ⊢ Guilty(ann)), expect=false,
+      why="the accused is Carl")
+check(F, :(Accuses(ann, carl) + Accuses(carl, ann) ⊢ Guilty(carl)), expect=false,
+      why="mutual accusation: one accuser each")
+
+note("The alibi defeats the rule, and settles the matter the other way.")
+check(F, :(Accuses(ann, carl) + Accuses(bob, carl) + Alibi(carl) ⊢ Guilty(carl)), expect=false,
+      why="defeated")
+check(F, :(Accuses(ann, carl) + Accuses(bob, carl) + Alibi(carl) + Guilty(carl) ⊢ 0), expect=true,
+      why="asserting guilt as well is incompatible")
+check(F, :(Accuses(ann, carl) + Accuses(bob, carl) + Alibi(ann) ⊢ Guilty(carl)), expect=false,
+      why="not listed: Ann's alibi was never declared harmless")
+check(F, :(Accuses(ann, carl) + Accuses(bob, carl) ⊢ Guilty(carl) + Alibi(carl)), expect=true)
+check(F, :(Accuses(ann, carl) + Accuses(bob, carl) ⊢ Guilty(carl) + Alibi(ann)), expect=false,
+      why="not listed: an extra conclusion is as much an addition as an extra premise")
+
+# ## 4. Logical vocabulary
+#
+# The claimables, as conceptual roles. Names are chosen to read like the claims.
+
+banner("4. Logical vocabulary")
+
+AnnC, BobC, CarlA = RolePair(F, :(Accuses(ann, carl))), RolePair(F, :(Accuses(bob, carl))),
+                    RolePair(F, :(Accuses(carl, ann)))
+GuiltyC, AlibiC = RolePair(F, :(Guilty(carl))), RolePair(F, :(Alibi(carl)))
+
+ask("Accuses(ann,carl), Accuses(bob,carl) ⊨ Guilty(carl)", [AnnC, BobC] ⊩ [GuiltyC], expect=true)
+ask("Accuses(ann,carl) ⊨ Guilty(carl)", AnnC ⊩ GuiltyC, expect=false)
+ask("Accuses(ann,carl), Accuses(ann,carl) ⊨ Guilty(carl)", [AnnC, AnnC] ⊩ [GuiltyC], expect=false,
+    why="the same accuser twice is one accuser")
+ask("Accuses(ann,carl) ∧ Accuses(bob,carl) ⊨ Guilty(carl)", (AnnC ∧ BobC) ⊩ GuiltyC, expect=true,
+    why="conjunction makes the two-premise implication explicit")
+
+note("Negation and the alibi.")
+ask("Alibi(carl) ⊨ ¬Guilty(carl)", AlibiC ⊩ ¬GuiltyC, expect=true)
+ask("Guilty(carl) ⊨ ¬Alibi(carl)", GuiltyC ⊩ ¬AlibiC, expect=true)
+ask("Accuses(ann,carl), Accuses(bob,carl), Alibi(carl) ⊨ Guilty(carl)",
+    [AnnC, BobC, AlibiC] ⊩ [GuiltyC], expect=false, why="defeated")
+ask("Accuses(ann,carl), Accuses(bob,carl), Alibi(carl) ⊨ ¬Guilty(carl)",
+    [AnnC, BobC, AlibiC] ⊩ [¬GuiltyC], expect=true, why="the alibi wins")
+ask("Accuses(ann,carl), Accuses(bob,carl) ⊨ Guilty(carl) ∨ Alibi(carl)",
+    [AnnC, BobC] ⊩ [GuiltyC ∨ AlibiC], expect=true,
+    why="disjunction makes the two-conclusion implication explicit")
+ask("Accuses(ann,carl), Accuses(bob,carl), ¬Alibi(carl) ⊨ Guilty(carl)",
+    [AnnC, BobC, ¬AlibiC] ⊩ [GuiltyC], expect=true,
+    why="negation moves the alibi across the turnstile")
+ask("Accuses(ann,carl), Accuses(bob,carl) ⊨ Guilty(carl) ∨ Alibi(ann)",
+    [AnnC, BobC] ⊩ [GuiltyC ∨ RolePair(F, :(Alibi(ann)))], expect=false,
+    why="not listed")
+
+note("Conditionals.")
+ask("⊨ (Accuses(ann,carl) ∧ Accuses(bob,carl)) ⇒ Guilty(carl)", [] ⊩ ((AnnC ∧ BobC) ⇒ GuiltyC), expect=true)
+ask("⊨ Accuses(ann,carl) ⇒ Guilty(carl)", [] ⊩ (AnnC ⇒ GuiltyC), expect=false)
+ask("⊨ Alibi(carl) ⇒ ¬Guilty(carl)", [] ⊩ (AlibiC ⇒ ¬GuiltyC), expect=true)
+ask("Accuses(ann,carl) ⊨ Accuses(bob,carl) ⇒ Guilty(carl)", AnnC ⊩ (BobC ⇒ GuiltyC), expect=true,
+    why="with Ann's testimony in hand, Bob's would convict")
+ask("Accuses(ann,carl) ⊨ Accuses(carl,ann) ⇒ Guilty(carl)", AnnC ⊩ (CarlA ⇒ GuiltyC), expect=false)
+
+# ## 5. Quantifiers
+#
+# `∀([:x, :z], A)` binds `x` and `z` in `A`, and they range over distinct
+# individuals, both different from anyone already mentioned in `A`.
+
+banner("5. Quantifiers")
+
+Axy, Azy = RolePair(F, :(Accuses(x, y))), RolePair(F, :(Accuses(z, y)))
+Gy, Ay = RolePair(F, :(Guilty(y))), RolePair(F, :(Alibi(y)))
+
+ask("⊨ ∀x∀y∀z. (Accuses(x,y) ∧ Accuses(z,y)) ⇒ Guilty(y)",
+    [] ⊩ ∀([:x, :y, :z], (Axy ∧ Azy) ⇒ Gy), expect=true, why="the rule, as a law")
+ask("⊨ ∀x∀y. Accuses(x,y) ⇒ Guilty(y)", [] ⊩ ∀([:x, :y], Axy ⇒ Gy), expect=false)
+ask("⊨ ∀y. Alibi(y) ⇒ ¬Guilty(y)", [] ⊩ ∀(:y, Ay ⇒ ¬Gy), expect=true)
+ask("⊨ ∀x∀y∀z. (Accuses(x,y) ∧ Accuses(z,y) ∧ Alibi(y)) ⇒ Guilty(y)",
+    [] ⊩ ∀([:x, :y, :z], (Axy ∧ Azy ∧ Ay) ⇒ Gy), expect=false, why="defeated under the quantifier too")
+
+note("Existential premises: it takes two accusers, whoever they are.")
+Axc, Azc = RolePair(F, :(Accuses(x, carl))), RolePair(F, :(Accuses(z, carl)))
+ask("∃x∃z. Accuses(x,carl) ∧ Accuses(z,carl) ⊨ Guilty(carl)", ∃([:x, :z], Axc ∧ Azc) ⊩ GuiltyC, expect=true)
+ask("∃x. Accuses(x,carl) ⊨ Guilty(carl)", ∃(:x, Axc) ⊩ GuiltyC, expect=false)
+ask("∃x. Accuses(x,carl), Alibi(carl) ⊨ ¬Guilty(carl)", [∃(:x, Axc), AlibiC] ⊩ [¬GuiltyC], expect=true)
+ask("Alibi(carl) ⊨ ¬∃x∃z. Accuses(x,carl) ∧ Accuses(z,carl)", AlibiC ⊩ ¬∃([:x, :z], Axc ∧ Azc), expect=false,
+    why="an alibi does not mean nobody accuses you")
+
+# ## 6. Does "anyone" depend on who is in the room? (Beck–Chevalley)
+#
+# Ann has testified. Would one more accuser convict Carl? Consider the claim
+#
+#     ∀z. Accuses(z, carl) ⇒ Guilty(carl)
+#
+# A bound variable ranges over individuals distinct from everyone *in scope*.
+# So the claim can be evaluated in two settings: with only Carl in scope, so
+# that `z` may be anyone at all, Ann included; or with Ann in scope too, so
+# that `z` is someone else. `in_context(A, names)` puts individuals in scope
+# before a quantifier is applied.
+#
+# Beck–Chevalley is the principle that the two settings agree: that a
+# quantified claim has the same content whichever further individuals happen
+# to be in scope when it is evaluated. Put differently, first quantifying and
+# then bringing a new individual into the conversation comes to the same thing
+# as first bringing them in and then quantifying.
+#
+# In this court it fails, and the court itself says why. Identifying the two
+# accusers in the rule gives `Accuses(x, y), Accuses(x, y) ⊢ Guilty(y)`, which
+# is `Accuses(x, y) ⊢ Guilty(y)`: one accuser convicts, which the court
+# rejects. A frame whose good implications are closed under identifying
+# individuals in this way satisfies Beck–Chevalley; this one is not, and does
+# not. The two readings of the claim are then genuinely different claims, not
+# merely different answers to one question.
+
+banner("6. Does \"anyone\" depend on who is in the room? (Beck–Chevalley)")
+
+anyone  = ∀(:z, Azc ⇒ GuiltyC)                                   # only Carl in scope: z may be anyone, Ann included
+another = ∀(:z, in_context(Azc ⇒ GuiltyC, [:ann, :z, :carl]))   # Ann in scope too: z is someone else
+
+ask("Accuses(ann,carl) ⊨ ∀z. Accuses(z,carl) ⇒ Guilty(carl)   [z: anyone at all]", AnnC ⊩ anyone, expect=false,
+    why="z might be Ann again, and her second testimony adds nothing")
+ask("Accuses(ann,carl) ⊨ ∀z. Accuses(z,carl) ⇒ Guilty(carl)   [z: anyone else]", AnnC ⊩ another, expect=true)
+ask("the two readings are the same claim", in_context(anyone, [:ann, :carl]) == another, expect=false,
+    why="Beck–Chevalley fails in this court")
+
+note("Compare a court in which one accuser already convicts (or else there is an alibi). " *
+     "Its good implications are closed under identifying individuals, and the two readings coincide.")
+
+one_accuser = [:(Accuses(x, y) ⊢ Guilty(y)), :(Accuses(x, y) ⊢ Guilty(y) + Alibi(y))]
+F₁ = Frame(Σ, κ([defeasible; one_accuser]) ∪ 𝒲(robust) ∪ containment(Σ))
+AnnC₁, Azc₁, GuiltyC₁ = RolePair(F₁, :(Accuses(ann, carl))), RolePair(F₁, :(Accuses(z, carl))),
+                        RolePair(F₁, :(Guilty(carl)))
+anyone₁  = ∀(:z, Azc₁ ⇒ GuiltyC₁)
+another₁ = ∀(:z, in_context(Azc₁ ⇒ GuiltyC₁, [:ann, :z, :carl]))
+
+ask("Accuses(ann,carl) ⊨ ∀z. Accuses(z,carl) ⇒ Guilty(carl)   [z: anyone at all]", AnnC₁ ⊩ anyone₁, expect=true)
+ask("Accuses(ann,carl) ⊨ ∀z. Accuses(z,carl) ⇒ Guilty(carl)   [z: anyone else]", AnnC₁ ⊩ another₁, expect=true)
+ask("the two readings are the same claim", in_context(anyone₁, [:ann, :carl]) == another₁, expect=true,
+    why="Beck–Chevalley holds in this court")
 
 println()
 

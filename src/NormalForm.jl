@@ -39,9 +39,9 @@ maxsize(gens::Set{<:Sequent})::Int = maximum(length, gens; init=0)
 # `max(β + 1, s_κ′ + 2)` suffices, as does `s_κ′ + 2` for ({\bf ii}).
 
 """
-Is `E = κ′ ∪ ℛ(μ′) ∪ 𝒲(λ′)` all of `M` (`lemma:covertest` i)? With
-`reflexive = true`, does it contain `R` (`lemma:covertest` ii)? These decide
-`𝒲(z) ⊆ C` and `ℛ(z) ⊆ C` as `covers({z} ⊸ C)` and `covers({z} ⊸ C; reflexive = true)`.
+Is `E = κ′ ∪ ℛ(μ′) ∪ 𝒲(λ′)` all of `M`? With `reflexive = true`, does it
+contain `R`? These decide `𝒲(z) ⊆ C` and `ℛ(z) ⊆ C` as `covers({z} ⊸ C)` and
+`covers({z} ⊸ C; reflexive = true)`.
 """
 function covers(E::Constructible{K}, Σ::Signature; reflexive::Bool=false)::Bool where K
   Δ = E.context
@@ -114,18 +114,16 @@ end
 #     X ↦ S ∩ ⋂_x (G_Γ • x) ⊸ X  =  S ∩ ⋂_x ⋂_{π ∈ G_Γ} π({x} ⊸ X),
 #
 # a singleton residual and an orbit intersection per atom orbit. Iterating from
-# `X₀ = S` gives `Xₙ = {t | t + u ∈ S for all |u| ≤ n}`, and by
-# `lemma:boundedobligation` (for the `ℛ` part) and `lemma:covertest` applied to
-# `{z} ⊸ S` (for the `κ` part) this is already `⊤ ⊸ S` once
-# `n ≥ max(2s_μ + 2s_κ + 2, s_μ + 3s_κ + 2)`; the `𝒲` part is in every `Xₙ`.
-# (With `𝔹` coefficients an obligation `t + u ∉ S` shrinks to `|u| ≤ max(β + 1,
-# s_κ + 2)`, `β` the largest imbalance in `μ`, by the argument for the covering
-# test: drop from `u` its terms already in `t`, its balanced pairs, and the
-# atoms whose mate lies in `t`, none of which can put `t + u` into `ℛ(μ)` — so
-# the same bound is safe.) Usually it stabilizes far sooner, which is detected
-# generator by generator: `Xₙ₊₁ ⊆ Xₙ` always, and `Xₙ ⊆ Xₙ₊₁` iff each `κ`
-# generator is in `Xₙ₊₁` and each `ℛ` generator `m` has `ℛ(m) ⊆ Xₙ₊₁` — the `𝒲`
-# generators come along automatically, `𝒲(l) + x ⊆ 𝒲(l)`.
+# `X₀ = S` gives `Xₙ = {t | t + u ∈ S for all |u| ≤ n}`, this is already `⊤ ⊸ S`
+# once `n ≥ max(2s_μ + 2s_κ + 2, s_μ + 3s_κ + 2)`; the `𝒲` part is in every
+# `Xₙ`. (With `𝔹` coefficients an obligation `t + u ∉ S` shrinks to `|u| ≤
+# max(β + 1, s_κ + 2)`, `β` the largest imbalance in `μ`, by the argument for
+# the covering test: drop from `u` its terms already in `t`, its balanced pairs,
+# and the atoms whose mate lies in `t`, none of which can put `t + u` into
+# `ℛ(μ)` — so the same bound is safe.) Usually it stabilizes far sooner, which
+# is detected generator by generator: `Xₙ₊₁ ⊆ Xₙ` always, and `Xₙ ⊆ Xₙ₊₁` iff
+# each `κ` generator is in `Xₙ₊₁` and each `ℛ` generator `m` has `ℛ(m) ⊆ Xₙ₊₁` —
+# the `𝒲` generators come along automatically, `𝒲(l) + x ⊆ 𝒲(l)`.
 
 """
 The absorption `⊤ ⊸ S = {t | 𝒲(t) ⊆ S}` of a constructible triple, as a

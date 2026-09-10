@@ -13,7 +13,9 @@ R(i,j) = Term(R′, [i,j])
 const ∅ = Set{Int}()  
 const Γ1 = Set([1])
 
-# Skip testing renaming, as it gets tested elsewhere
+default_multiplicity!(ℕ)
+
+
 
 # Orbits
 ########
@@ -133,7 +135,7 @@ orbits(xs, Δ) = Set{Sequent}(canonicalize(x, Δ) for x in xs)
 @test Set(refine(Set([Sequent(:(Q(1,2) ⊢ 0))]), Γ1, Set([1, 2]))) ==
       Set(Sequent.([:(Q(1,3) ⊢ 0), :(Q(1,2) ⊢ 0)]))
 
-# `refine(g, Γ, Δ)` meets every `G_{Γ+Δ}`-orbit of `G_Γ • g` (`lemma:orbitrefine`):
+# `refine(g, Γ, Δ)` meets every `G_{Γ+Δ}`-orbit of `G_Γ • g`:
 # every element of the orbit with names in a bounded pool lands in one of them.
 for s in seqs, Γ in [∅, Γ1, Set([1, 2])], Δ in [∅, Set([3]), Set([3, 5]), Set([2, 5])]
   Δ = setdiff(Δ, Γ)

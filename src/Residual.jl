@@ -89,7 +89,8 @@ each context `Γ + z`, so the results are cached in `memo` by context. Callers
 pass only `C` and `Γ`.
 """
 function orbit_intersection(C::Constructible{K}, Γ::Set{Int},
-                            memo::Dict{Set{Int},Constructible{K}}=Dict{Set{Int},Constructible{K}}()
+                            memo::Dict{Set{Int},Constructible{K}}
+                             = Dict{Set{Int},Constructible{K}}()
                            )::Constructible{K} where K
   Γ ⊆ C.context || error("Context $Γ is not contained in $(C.context)")
   Γ == C.context && return C  # everything is already G_Γ-invariant
@@ -97,13 +98,13 @@ function orbit_intersection(C::Constructible{K}, Γ::Set{Int},
   Δ = setdiff(C.context, Γ)
   κ = Set{Sequent{K}}(k for k in C.strict if orbit_subset(k, C, Γ))
   W, R = Set{Sequent{K}}(), Set{Sequent{K}}()  # candidate 𝒲 and ℛ generators
-  # Every 𝒲/ℛ generator of the answer lies above some d₀ ∈ λ ∪ μ: search above each.
+  # Every 𝒲/ℛ gen of the answer lies above some d₀ ∈ λ ∪ μ: search above each.
   for (d₀, refl) in [[(l, false) for l in C.weak]; [(m, true) for m in C.refl]]
     isdisjoint(d₀.supp, Δ) || continue  # d₀ ≤ t and t avoids Δ, so d₀ does too
     # Names which a Γ-fixing π is allowed to move
     movable_names = sort(collect(setdiff(d₀.supp, Γ)))
     # All ways a Γ-fixing π can send a name of d₀ into Δ. These are the π not
-    # handled by d₀ alone, so each pair is one requirement `assemble` must discharge.
+    # handled by d₀ alone, so each pair is one req `assemble` must discharge.
     pairs = [(a, z) for a in movable_names for z in sort(collect(Δ))]
     P = refl ? d₀ : nothing
     for (w, P′) in assemble(d₀, P, pairs, C, Γ, memo)
@@ -129,10 +130,11 @@ only be larger. This is what keeps the search small — an equivariant `C` needs
 no pieces at all — and loses no minimal witness.
 """
 function assemble(w::Sequent{K}, P::Union{Nothing,Sequent{K}}, pairs::Vector,
-                  C::Constructible{K}, Γ::Set{Int}, memo::Dict{Set{Int},Constructible{K}}) where K
+                  C::Constructible{K}, Γ::Set{Int}, 
+                  memo::Dict{Set{Int},Constructible{K}}) where K
   isempty(pairs) && return [(w, P)]
   (a, z), rest = pairs[1], pairs[2:end]
-  D_z = orbit_intersection(C, Γ ∪ Set([z]), memo)  # the target after renaming a ↦ z
+  D_z = orbit_intersection(C, Γ ∪ Set([z]), memo)  # target after renaming a ↦ z
   u = isnothing(P) ? w : refl_above(P, w)
   ρu = rename(u, Renaming(a => z))
   if in_weak(ρu, D_z) || (!isnothing(P) && in_refl(ρu, D_z))
@@ -168,41 +170,41 @@ function placements(piece::Sequent{K}, a::Int, z::Int, w::Sequent{K}, Γ::Set{In
   [rename(p, Renaming(z => a)) for p in orbit(piece, ctx, pool)]
 end
 
-
-
 # The general residual
 #---------------------
 
 """
 The residual `A ⊸ C = {t | ∀a ∈ A: a + t ∈ C}` as a constructible triple
-supported by `A.context` (`lemma:tripleresidual`). `C` must be equivariant (context `∅`), as
-the incompatibility set of a frame is, and in normal form (`lemma:normalform`,
-`normal_form` in `NormalForm.jl`; the three-argument method normalizes first),
+supported by `A.context`. `C` must be equivariant
+(context `∅`), as the incompatibility set of a frame is, and in normal form,
 which lets the residuals by `𝒲`- and `ℛ`-generators curry into the two
-absorptions of `C` read off from its presentation (`cor:nfabsorption`):
+absorptions of `C` read off from its presentation:
 
     𝒲(g) ⊸ C = {g} ⊸ (⊤ ⊸ C) = {g} ⊸ 𝒲(λ_C)
     ℛ(g) ⊸ C = {g} ⊸ (R ⊸ C) = {g} ⊸ (𝒲(λ_C) ∪ ℛ(μ_C))
 
-Each generator `g` of `A` then contributes the factor
-`⋂_{π ∈ G_Γ} π({g} ⊸ D)` for the appropriate `D`, computed by `residual` at
-the context `Γ ∪ supp(g)` and `orbit_intersection` back down to `Γ`; the
-factors are combined by `intersect`. With no generators `A = ∅` and the
-residual is `⊤`.
+Each generator `g` of `A` then contributes the factor `⋂_{π ∈ G_Γ} π({g} ⊸ D)`
+for the appropriate `D`, computed by `residual` at the context `Γ ∪ supp(g)` and
+`orbit_intersection` back down to `Γ`; the factors are combined by `intersect`.
+With no generators `A = ∅` and the residual is `⊤`.
 
 Membership in `A ⊸ C` could be decided directly, generator by generator via
 `refine`; what this computes is a presentation.
 """
-function residual(A::Constructible{K}, C::Constructible{K})::Constructible{K} where K
-  isempty(C.context) || error("The residuand must be equivariant, got context $(C.context)")
+function residual(A::Constructible{K}, C::Constructible{K}
+                 )::Constructible{K} where K
+  isempty(C.context) || 
+    error("The residuand must be equivariant, got context $(C.context)")
   Γ = A.context
   ∅ = Set{Sequent{K}}()
   W = Constructible{K}(∅, ∅, C.weak, C.context; canonical=true)        # ⊤ ⊸ C
   WR = Constructible{K}(∅, C.refl, C.weak, C.context; canonical=true)  # R ⊸ C
   factor(g, D) = orbit_intersection(enlarge_context(residual(g, D), Γ), Γ)
+  # The factors are independent (each builds its own memo), so compute them on
+  # separate tasks; the fold stays serial so `prune` runs between each step.
+  jobs = [[(g, C) for g in A.strict]; [(g, W) for g in A.weak]; [(g, WR) for g in A.refl]]
+  tasks = [Threads.@spawn factor(g, D) for (g, D) in jobs]
   res = top(K, Γ)
-  for g in A.strict; res = res ∩ factor(g, C) end
-  for g in A.weak;   res = res ∩ factor(g, W) end
-  for g in A.refl;   res = res ∩ factor(g, WR) end
+  for t in tasks; res = res ∩ fetch(t) end
   res
 end

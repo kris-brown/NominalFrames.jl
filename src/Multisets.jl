@@ -1,4 +1,4 @@
-export MultiSet, ≼, ∨, ∧, sorted
+export MultiSet, ≼, ∨, ∧, sorted, Multiplicity, ℕ, 𝔹, default_multiplicity, default_multiplicity!
 
 """ Multisets represented by their finite support: i.e. all nonzero values """
 @struct_hash_equal struct MultiSet{T}
@@ -10,6 +10,7 @@ export MultiSet, ≼, ∨, ∧, sorted
   end
 end
 
+""" Empty multiset """
 (MultiSet{T}()::MultiSet{T}) where T = MultiSet(Dict{T,Int}())
 
 """ Convert list to multiset """
@@ -21,18 +22,35 @@ function MultiSet(vs::AbstractVector{T})::MultiSet{T} where T
   MultiSet(d)
 end
 
+""" A set as a multiset: every element with multiplicity `1` """
+(MultiSet(s::AbstractSet{T})::MultiSet{T}) where T = 
+  MultiSet(Dict{T,Int}(v => 1 for v in s))
 
 Base.keys(m::MultiSet) = keys(m.counts)
+
 (Base.haskey(m::MultiSet{T}, k::T)::Bool) where T = haskey(m.counts,k)
+
 (Base.getindex(m::MultiSet{T}, k::T)::Int) where T = getindex(m.counts,k)
+
 (Base.get(m::MultiSet{T}, k::T, def::Int)::Int) where T = get(m.counts,k, def)
+
 (Base.setindex!(m::MultiSet{T}, v::Int, k::T)) where T = setindex!(m.counts,v,k)
+
 Base.values(m::MultiSet) = values(m.counts)
+
 Base.collect(m::MultiSet) = collect(m.counts)
+
 Base.iterate(m::MultiSet, x...) = iterate(m.counts, x...)
+
 Base.length(m::MultiSet) = length(m.counts)
+
 Base.pairs(m::MultiSet) = pairs(m.counts)
+
 Base.copy(m::MultiSet) = MultiSet(copy(m.counts))
+
+Base.zero(::Type{MultiSet{T}}) where T = MultiSet{T}()
+
+Base.iszero(s::MultiSet) = isempty(s)
 
 
 function int_to_superscript(n::Integer)
@@ -42,21 +60,20 @@ function int_to_superscript(n::Integer)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", m::MultiSet)
-  print(io, "{")
-  for (k, v) in pairs(m) 
-    show(io,"text/plain", k)
-    print(io, int_to_superscript(v))
-    print(io, ", ")
-  end
-  print(io, "\b\b}")
+  entries = (sprint(show, "text/plain", k) * int_to_superscript(v) 
+             for (k, v) in pairs(m))
+  print(io, "{", join(entries, ", "), "}")
 end
 
 """ The support of a multiset, as the multiset with every multiplicity `1` """
-(support(m::MultiSet{T})::MultiSet{T}) where T = MultiSet(Dict{T,Int}(k => 1 for k in keys(m)))
+(support(m::MultiSet{T})::MultiSet{T}) where T = 
+  MultiSet(Dict{T,Int}(k => 1 for k in keys(m)))
 
-""" Ordering multisets as keys (a total order, not the meaningful partial order) """
+""" 
+Ordering multisets as keys (a total order, not the meaningful partial order) 
+"""
 (Base.isless(x::MultiSet{T}, y::MultiSet{T})::Bool) where T = 
-  isless(x.counts, y.counts)
+  isless(sorted(x), sorted(y))
 
 """
 A multiset as a sorted vector of `element => multiplicity` pairs: the canonical
@@ -105,7 +122,7 @@ end
 
 """ Meet in the pointwise order: `t ↦ min(x(t), y(t))` """
 function ∧(x::MultiSet{T}, y::MultiSet{T})::MultiSet{T} where T 
-  MultiSet(Dict{T,Int}(t => min(n, y[t]) for (t, n) in pairs(x) if haskey(y, t)))
+  MultiSet(Dict{T,Int}(t => min(n, y[t]) for (t,n) in pairs(x) if haskey(y, t)))
 end 
 
 """
@@ -120,3 +137,31 @@ function Base.:(-)(x::MultiSet{T}, y::MultiSet{T})::Dict{T,Int} where T
   end
   res
 end
+
+# Multiplicities
+################
+
+"""
+Dispatch tags for the multiplicities an element may have: any natural number
+(`ℕ`, multisets) or at most one (`𝔹`, sets).
+"""
+abstract type Multiplicity end
+
+""" Multisets: the free commutative monoid, without contraction """
+struct ℕ <: Multiplicity end
+
+""" Sets: the free commutative idempotent monoid, with contraction """
+struct 𝔹 <: Multiplicity end
+
+"""
+The multiplicity assumed when none is named.
+"""
+const DEFAULT_MULTIPLICITY = Ref{DataType}(𝔹)
+
+default_multiplicity() = DEFAULT_MULTIPLICITY[]
+
+""" 
+Make `K` the multiplicity assumed when none is named, until changed again 
+"""
+default_multiplicity!(::Type{K}) where K<:Multiplicity = 
+  (DEFAULT_MULTIPLICITY[] = K)

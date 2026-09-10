@@ -2,7 +2,7 @@
 
 
 ## What is this for?
-This is a codebase for computational "logical expressivism", as described in [Reasons for Logic, Logic for Reasons (2025)]((https://philpapers.org/archive/HLOPOR.pdf)). This is a 
+This is a codebase for computational "logical expressivism", as described in [Reasons for Logic, Logic for Reasons (2025)]((https://philpapers.org/archive/HLOPOR.pdf)) (R4LL4R). This is a 
 framework which *begins* with a consequence relation, e.g. 
 
 ```
@@ -22,8 +22,8 @@ However, a frame seems to have no explicit appeals to these kinds of semantic ga
 
 Therefore we can, having started with a _pre-logical_ notion of consequence, run logically-articulated queries on the implication frame. There are other aspirations for what to do with this construction, but at the moment running queries (in the so-called "implication space" of the frame, using semantic values and semantic consequence) is the primary feature of this codebase. 
 
->[!Warning] A limitation
-> Nominal sets do not have a notion of duplication of variables (equivalently, they do not have a notion of substitution with arbitrary variables: only substitution of a variable with a free variable). This means if one's signature has `Loves(-,=)` as a predicate, that one is capable of declaring good inferences such as `Loves(a,b)⊢Loves(b,a)` but _not_ inferences such as `⊢Loves(a,a)`. In some sense this is a limitation, but in another it is not. One might imagine that `⊢Loves(a,a)` is simply syntactic sugar for `⊢Loves²(a)`, and one could automatically generate predicates associated with each possible identification of the argument positions. Regardless, nominal sets would treat these as different predicates for all practical purposes.  
+>[!Warning] 
+> **A limitation:** Nominal sets do not have a notion of duplication of variables (equivalently, they do not have a notion of substitution with arbitrary variables: only substitution of a variable with a free variable). This means if one's signature has `Loves(-,=)` as a predicate, that one is capable of declaring good inferences such as `Loves(a,b)⊢Loves(b,a)` but _not_ inferences such as `⊢Loves(a,a)`. In some sense this is a limitation, but in another it is not. One might imagine that `⊢Loves(a,a)` is simply syntactic sugar for `⊢Loves²(a)`, and one could automatically generate predicates associated with each possible identification of the argument positions. Regardless, nominal sets would treat these as different predicates for all practical purposes.  
 
 
 ## Why do logic this way?
@@ -31,13 +31,18 @@ Therefore we can, having started with a _pre-logical_ notion of consequence, run
 One reason to work in this "backwards" direction from traditional semantics is that there are many notions of consequence that are inexpressible from the semantic viewpoint.[^2] It is taken as a criterion of adequacy that one's formal semantics has a consequence relation which satisfies _reflexivity_, _transitivity_, and _monotonicity_ (among the three it is most common to reject this last demand). This means, when trying to pick a logic to describe / represent / navigate some subject matter, one is _forced_ to assume that the consequence relation of that domain satisfies these structural principles. This is far too prescriptive for a modeling tool which is meant to be descriptive. Although ordinary mathematics and scientific reasoning often satisfies these structures, we hope the logical expressivist approach allows one to retain all of the useful tools of formal semantics without having to compromise on faithfully representing the our domains which truly matter to us, even if their ordinary/pre-logical consequence relations fail to have the structure expected of purely logical consequence relations
 
 
-[^2]: This critique does not apply to some sufficiently rich approaches to formal semantics (in particular, some [hyperintentional](https://plato.stanford.edu/entries/hyperintensionality/) ones, see Chapter 4 of [Reasons for Logic, Logic for Reasons](https://www.routledge.com/Reasons-for-Logic-Logic-for-Reasons-Pragmatics-Semantics-and-Conceptual-Roles/Hlobil-Brandom/p/book/9781032360775)).
+[^2]: This critique does not apply to some sufficiently rich approaches to formal semantics (in particular, some [hyperintentional](https://plato.stanford.edu/entries/hyperintensionality/) ones, see Chapter 4 of [R4LL4R](https://www.routledge.com/Reasons-for-Logic-Logic-for-Reasons-Pragmatics-Semantics-and-Conceptual-Roles/Hlobil-Brandom/p/book/9781032360775)).
 
-Note this is a distinct approach from "nonmonotonic logic". It is classically meta-reasoning about non-monotonic consequence relations.
+Note this is a distinct approach from traditional "nonmonotonic logic". It is classically meta-reasoning about non-monotonic consequence relations.
 
 ## How to use
 
-See the `demos/` folder.
+See the `demos/` folder. Both demos are written for readers of _R4LL4R_ and assume contraction and containment throughout:
+
+- `demos/demo.jl` — birds, penguins and flying: declaring a nonmonotonic implication frame, then asking it logically complex questions (¬, ∧, ∨, ⇒, ∀, ∃).
+- `demos/courtroom.jl` — accusers, alibis and guilt: a two-place predicate, several individuals, quantifiers, and a court in which Beck–Chevalley fails (the content of "anyone" depends on who is in scope).
+
+Run one with `julia --project=. demos/demo.jl`, or both with `julia --project=. demos/rundemos.jl`.
 
 ## Road map
 
@@ -47,7 +52,7 @@ See the `demos/` folder.
 - Scorekeeping dynamics
   - Also 'argument crux' identification
 
->[!Caution] Note
-> This is a sequel to [this repo](https://github.com/kris-brown/ROLE/), which is informed by this [category-theoretic reconstruction](https://arxiv.org/abs/2605.24796) of Chapter 5 of [R4LL4L](https://www.routledge.com/Reasons-for-Logic-Logic-for-Reasons-Pragmatics-Semantics-and-Conceptual-Roles/Hlobil-Brandom/p/book/9781032360775). The present extension to use nominal sets to represent predication lies ahead of any work which has been published, so it should be considered extremely experimental.
-> Because this library is currently under active development, it is not yet at a point where a constant API/behavior can be assumed. That being said, if this project looks interesting/relevant please contact me at kris@topos.institute!
+>[!Caution]
+> This repo is a sequel to [ROLE.jl](https://github.com/kris-brown/ROLE/), which is informed by this [category-theoretic reconstruction](https://arxiv.org/abs/2605.24796) of Chapter 5 of [R4LL4L](https://www.routledge.com/Reasons-for-Logic-Logic-for-Reasons-Pragmatics-Semantics-and-Conceptual-Roles/Hlobil-Brandom/p/book/9781032360775). The present extension to use nominal sets to represent predication lies ahead of any work which has been published, so it should be considered extremely experimental.
+> Because this library is currently under active development, it is not yet at a point where a constant API/behavior can be assumed. That being said, if this project looks interesting/relevant please contact me at `kris@topos.institute`!
 

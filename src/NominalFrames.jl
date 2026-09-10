@@ -5,7 +5,6 @@ using StructEquality
 const Maybe{T} = Union{Nothing, T}
 
 include("Multisets.jl")         # checked
-include("Semiring.jl")          # ℕ (multisets) and 𝔹 (sets) coefficients
 include("Syntax.jl")            # checked
 include("Orbits.jl")            # checked
 include("PowerElems.jl")        # checked
