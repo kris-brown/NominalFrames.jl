@@ -9,7 +9,8 @@ framework which *begins* with a consequence relation, e.g.
 Bird(x) ⊢ Flies(x)   Penguin(x),Bird(x) ⊬ Flies(x)   Bird(x) ⊢ Flies(x),Swims(x)
 ```
 
-> [!Note] How to read the ⊢ notation 
+> [!Note] 
+> **How to read the ⊢ notation:** 
 > The turnstile ⊢ denotes a notion of _consequence_, which could be formal (e.g. the consequence relation of intuitionistic logic) or informal (e.g. some model of what sentences follow from others... or, in the other direction, which are good reasons for others). Once you are comfortable with that, the next hurdle to overcome is the fact _multiple_ sentences can appear on either side of the turnstile! One trick is to think of the commas on the left (between premises) as "and" and the commas to the right (between conclusions) as "or". So, if you are used to thinking of truth conditions rather than taking this notion of inference as primary, then an inference is good if all of the premises being true means at least one of the conclusions is true. One last way to think about this without an appeal to 'truth': the inference is good if it's bad to simultaneously assert all the premises and deny all the conclusions.
 
 The data of one of these consequence relations is called an _implication frame_. You have access to at least one of these in virtue of being a fluent speaker of some natural language, but you could also come up with many more.[^1] This codebase allows a user to declare their own implication frames by specifying a signature (a set of predicates with arities, e.g. `Bird(-), Flies(-),IsBiggerThan(-,=),MoonIsMadeOfCheese()`) and then stating precisely which implications are the good ones, according to the frame.
